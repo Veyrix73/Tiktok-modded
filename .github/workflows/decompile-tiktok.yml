@@ -1,0 +1,79 @@
+name: Decompile TikTok for static review
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/decompile-tiktok.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  decompile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository and download LFS object
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 1
+
+      - name: Install Apktool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apktool
+
+      - name: Decode app without executing it
+        shell: bash
+        run: |
+          mkdir -p analysis
+          cp tiktok-47-9-3.zip tiktok-original.apk
+          set +e
+          apktool d -f -o decoded tiktok-original.apk > analysis/apktool.log 2>&1
+          status=$?
+          set -e
+          echo "$status" > analysis/apktool-exit-code.txt
+          if [ "$status" -eq 0 ]; then
+            echo "Apktool successfully decoded the package." > analysis/decode-status.txt
+            {
+              echo "# TikTok static DEX review"
+              echo
+              echo "Apktool decoded the archive as an APK. No APK code was executed."
+              echo
+              echo "## Package metadata"
+              if [ -f decoded/apktool.yml ]; then
+                grep -E '^(versionInfo|sdkInfo|packageInfo|  versionCode|  versionName|  minSdkVersion|  targetSdkVersion|  forcedPackageId)' decoded/apktool.yml || true
+              fi
+              echo
+              echo "## Profile banner / cover / header references"
+              grep -RniE --include='*.smali' --include='*.xml' --include='*.json' 'profile.{0,50}(banner|cover|background|header)|(banner|cover|background|header).{0,50}profile|user.{0,30}cover' decoded/smali* decoded/res decoded/assets 2>/dev/null | head -n 400 || true
+              echo
+              echo "## Banner class and resource references (first 300)"
+              grep -RniE --include='*.smali' 'banner' decoded/smali* 2>/dev/null | head -n 300 || true
+              echo
+              echo "## Decoded DEX folders"
+              find decoded -maxdepth 1 -type d -name 'smali*' -printf '%f\n' | sort
+            } > analysis/REPORT.md
+          else
+            {
+              echo "# TikTok static DEX review"
+              echo
+              echo "Apktool could not decode the archive as an APK (exit code $status)."
+              echo "No APK code was executed. See apktool.log for the parser error."
+              echo
+              echo "## Apktool output (last 250 lines)"
+              tail -n 250 analysis/apktool.log
+            } > analysis/REPORT.md
+          fi
+
+      - name: Upload static review
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiktok-dex-review
+          path: |
+            analysis/
+            decoded/AndroidManifest.xml
+            decoded/apktool.yml
+          if-no-files-found: warn
