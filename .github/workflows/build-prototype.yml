@@ -1,0 +1,86 @@
+name: Build independent TikTok+ concept prototype
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "prototype/**"
+      - ".github/workflows/build-prototype.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tiktokplus-independent-prototype
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and verify original Android prototype
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
+
+      - name: Install Gradle 8.9
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            https://services.gradle.org/distributions/gradle-8.9-bin.zip \
+            --output /tmp/gradle-8.9-bin.zip
+          unzip -q /tmp/gradle-8.9-bin.zip -d /tmp
+          /tmp/gradle-8.9/bin/gradle --version
+
+      - name: Build debug APK from original source
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/gradle-8.9/bin/gradle \
+            --no-daemon \
+            --stacktrace \
+            -p prototype \
+            :app:assembleDebug
+          mkdir -p out
+          cp prototype/app/build/outputs/apk/debug/app-debug.apk \
+            "out/test-Tiktok-plus-prototype.apk"
+
+      - name: Verify APK signature and package identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
+          APK="out/test-Tiktok-plus-prototype.apk"
+          test -s "$APK"
+          "$BUILD_TOOLS/apksigner" verify --verbose "$APK"
+          "$BUILD_TOOLS/aapt" dump badging "$APK" | tee out/apk-badging.txt
+          grep -F "package: name='com.veyrix.tiktokplus.prototype'" out/apk-badging.txt
+          grep -F "application-label:'TikTok+ Test (Prototype)'" out/apk-badging.txt
+          sha256sum "$APK" | tee out/SHA256SUMS.txt
+
+      - name: Upload prototype test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-Tiktok-plus-prototype
+          path: |
+            out/test-Tiktok-plus-prototype.apk
+            out/apk-badging.txt
+            out/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
