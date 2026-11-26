@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Apply the minimal TikTok+ test branding to an Apktool-decoded package.
+"""Apply minimal, reversible TikTok+ test branding to an Apktool-decoded app.
 
-This deliberately does not change TikTok feature gates, API calls, login flows,
-or account/security checks.
+This does not change feature gates, API calls, login flows, or security checks.
 """
 from __future__ import annotations
 
@@ -18,17 +17,18 @@ TEXT_SUFFIXES = {".xml", ".smali", ".json", ".txt", ".properties", ".mf", ".cfg"
 
 def patch_manifest(path: Path) -> None:
     text = path.read_text(encoding="utf-8")
-    if f'package="{OLD_APP_ID}"' not in text:
+    old_package = f'package="{OLD_APP_ID}"'
+    if old_package not in text:
         raise SystemExit(f"Expected package attribute not found in {path}")
 
-    text = text.replace(f'package="{OLD_APP_ID}"', f'package="{TEST_APP_ID}"', 1)
+    text = text.replace(old_package, f'package="{TEST_APP_ID}"', 1)
 
-    app_match = re.search(r"<application\\b[^>]*>", text, flags=re.DOTALL)
+    app_match = re.search(r"<application\b[^>]*>", text, flags=re.DOTALL)
     if not app_match:
         raise SystemExit("Could not find the <application> element in AndroidManifest.xml")
 
     app_tag = app_match.group(0)
-    label_pattern = re.compile(r'android:label=(["\']).*?\\1', flags=re.DOTALL)
+    label_pattern = re.compile(r"""android:label=(?:"[^"]*"|'[^']*')""")
     if label_pattern.search(app_tag):
         app_tag = label_pattern.sub(f'android:label="{TEST_LABEL}"', app_tag, count=1)
     else:
@@ -64,13 +64,15 @@ def main() -> None:
             changed_refs += count
 
     manifest_text = manifest.read_text(encoding="utf-8")
-    if f'package="{TEST_APP_ID}"' not in manifest_text or f'android:label="{TEST_LABEL}"' not in manifest_text:
-        raise SystemExit("Manifest branding verification failed")
+    if f'package="{TEST_APP_ID}"' not in manifest_text:
+        raise SystemExit("Manifest package verification failed")
+    if f'android:label="{TEST_LABEL}"' not in manifest_text:
+        raise SystemExit("Manifest launcher-label verification failed")
 
     print(f"Application ID: {TEST_APP_ID}")
     print(f"Launcher label: {TEST_LABEL}")
     print(f"Updated package references in {changed_files} text files ({changed_refs} references).")
-    print("No feature gates, login code, API endpoints, or account-security checks were changed.")
+    print("Feature gates, login code, API endpoints, and account-security checks were not changed.")
 
 
 if __name__ == "__main__":
