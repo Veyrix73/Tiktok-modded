@@ -48,29 +48,32 @@ jobs:
         with:
           packages: platform-tools
 
-      - name: Install Apktool
+      - name: Install pinned Apktool 3.0.3
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y apktool
-          apktool --version
+          set -euo pipefail
+          mkdir -p tools
+          curl --fail --location --retry 3 \
+            https://github.com/iBotPeaches/Apktool/releases/download/v3.0.3/apktool_3.0.3.jar \
+            --output tools/apktool_3.0.3.jar
+          echo "dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423  tools/apktool_3.0.3.jar" | sha256sum --check
+          java -jar tools/apktool_3.0.3.jar --version
           sdkmanager "build-tools;35.0.0"
 
       - name: Decode the original package
         shell: bash
         run: |
           set -euo pipefail
-          apktool d -f -o work/decoded tiktok-47-9-3.zip
+          java -Xms512m -Xmx8g -XX:+UseG1GC -jar tools/apktool_3.0.3.jar d -f -o work/decoded tiktok-47-9-3.zip
 
       - name: Apply TikTok+ test branding
         run: python3 scripts/brand_apk.py work/decoded
 
       - name: Rebuild APK
         shell: bash
-        env:
-          JAVA_TOOL_OPTIONS: -Xms512m -Xmx5g -XX:+UseG1GC
         run: |
           set -euo pipefail
-          apktool b work/decoded --use-aapt2 -o dist/test-Tiktok-plus-unsigned.apk
+          java -Xms512m -Xmx8g -XX:+UseG1GC -jar tools/apktool_3.0.3.jar b work/decoded -o dist/test-Tiktok-plus-unsigned.apk
           test -s dist/test-Tiktok-plus-unsigned.apk
           unzip -tq dist/test-Tiktok-plus-unsigned.apk
 
