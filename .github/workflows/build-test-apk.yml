@@ -66,6 +66,8 @@ jobs:
 
       - name: Rebuild APK
         shell: bash
+        env:
+          JAVA_TOOL_OPTIONS: -Xms512m -Xmx5g -XX:+UseG1GC
         run: |
           set -euo pipefail
           apktool b work/decoded --use-aapt2 -o dist/test-Tiktok-plus-unsigned.apk
