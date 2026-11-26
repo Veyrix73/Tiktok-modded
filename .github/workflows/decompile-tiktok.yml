@@ -59,10 +59,13 @@ jobs:
               echo "## Focused profile-background references"
               grep -RniE --include='*.smali' 'ProfileBackgroundComponent|IProfileBackgroundAbility|profile_background|default_profile_cover_url|ProfileBackgroundExp|isBackgroundCoverClicked' decoded/smali* 2>/dev/null | head -n 500 || true
               mkdir -p analysis/relevant-smali
-              grep -RliE --include='*.smali' 'ProfileBackgroundComponent|IProfileBackgroundAbility|profile_background|default_profile_cover_url|ProfileBackgroundExp|isBackgroundCoverClicked|ProfileBgImagePreviewActivity|extra_bg_aweme_id|extra_bg_offset_ratio|extra_bg_updated|0PlW|0PlV|0PlY|0UgY|0hbu' decoded/smali* 2>/dev/null | while IFS= read -r file; do
+              grep -RliE --include='*.smali' 'ProfileBackgroundComponent|IProfileBackgroundAbility|profile_background|default_profile_cover_url|ProfileBackgroundExp|isBackgroundCoverClicked|ProfileBgImagePreviewActivity|ProfileBgVideoPreviewActivity|extra_bg_aweme_id|extra_bg_offset_ratio|extra_bg_updated|ImageBackgroundHandler|L[X/]0hbu;|L[X/]0hYI;|L[X/]0hYY;|L[X/]0P4W;|L[X/]1D5q;|L[X/]1DCx;|L[X/]01L0;|L[X/]01Dc;|CropActivity|ARunnableS9S1200000_19_I1|ARunnableS65S0200000_19_I1|0PlW|0PlV|0PlY|0UgY' decoded/smali* 2>/dev/null | while IFS= read -r file; do
                 mkdir -p "analysis/relevant-smali/$(dirname "$file")"
                 cp "$file" "analysis/relevant-smali/$file"
               done
+              echo
+              echo "## Image gallery / crop / upload flow references"
+              grep -RniE --include='*.smali' 'ImageBackgroundHandler|0x2738|0x2739|L[X/]0P4W;|L[X/]1DCx;|L[X/]0hbu;->LJFF|L[X/]0hbu;->LJI|CropActivity|extra_image_url_list' decoded/smali* 2>/dev/null | head -n 500 || true
               echo
               echo "## Exact preview activity callers"
               grep -Rnl --include='*.smali' 'ProfileBgImagePreviewActivity' decoded/smali* 2>/dev/null | while IFS= read -r file; do
