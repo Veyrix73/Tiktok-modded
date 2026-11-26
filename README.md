@@ -20,26 +20,23 @@ TikTok+ is an experimental Android customization project based on the archived T
 
 ## Profile background code findings
 
-Static decode confirms the upstream app already has a real profile-background data path:
+Static decode confirms the upstream app has a profile-background data path:
 
-- `User.profileBackgroundMediaType`
-- `User.profileBackgroundImageUrlList`
-- `User.profileBackgroundAweme`
-- `User.profileBackgroundOffsetRatio`
-- `ProfileBgInfo.setImageUrlList(...)`
-- `ProfileBackgroundComponent`
-- `ProfileBgImagePreviewActivity`
+- `ProfileUser.profileBackground` is a serialized profile component (`profile_background`).
+- The profile background renderer consumes `ProfileBgInfo` data, including video/image variants.
+- The profile preview activity is `ProfileBgImagePreviewActivity`.
+- Its `onActivityResult` handles result code `0x7d2` and returns an `extra_bg_updated` flag to its caller.
+- The coroutine named `ProfileBgImagePreviewActivity$performSave$1` creates a timestamped `profile_background_*.png`, opens an output stream through the app context's content resolver, and compresses the preview bitmap as PNG.
 
-The legacy-to-new profile conversion code in `X/0OSC.smali` copies the media type and image URL list into `ProfileBgInfo`. The profile renderer checks for media type `1` and a non-empty image URL list before creating the image background data. This is a concrete rendering path, not just a string or feature flag.
-
-The remaining investigation is the source of those image URLs and whether the existing image preview/crop flow includes an upstream upload/save endpoint. A renderer accepting URLs does not itself implement upload or cross-user sharing.
+**Critical distinction:** that `performSave` routine saves the preview bitmap into the device's media storage. The inspected method does not call a network API or upload a profile-background image. So it is a local export/save action, not proof of a publish-to-profile feature. The `profile_background` profile component is populated through profile data; custom publishing still needs a supported server endpoint or a separate sync service.
 
 ## Implementation stages
 
-1. Trace the existing image selection, crop, upload, and save flow.
-2. Prototype local-only custom background selection and persistence.
-3. Add shared visibility only with a secure, documented sync service and user opt-in, unless the upstream app already provides a supported publishing endpoint.
-4. Test install, launch, profile loading, and regressions on Android.
+1. Trace the activity that launches the preview, the image selection/crop flow, and the caller of `performSave` to identify the intended feature boundary.
+2. Determine whether an existing supported TikTok API publishes profile background images; do not guess endpoint names or fabricate server behavior.
+3. If no supported publishing endpoint exists, prototype a local-only TikTok+ background using app-private storage and the existing renderer, clearly labelled local-only.
+4. Add shared visibility only with a secure, documented sync service and user opt-in.
+5. Test install, launch, profile loading, and regressions on Android.
 
 A locally selected image cannot automatically appear on another person's device. Shared banners require a server-side service or an upstream TikTok feature that accepts and returns the image URL.
 
