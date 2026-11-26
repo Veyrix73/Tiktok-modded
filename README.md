@@ -33,11 +33,11 @@ Static inspection of the original package confirms more than a renderer and prev
 
 ## Implementation stages
 
-1. Finish tracing the existing gallery -> crop -> upload worker -> profile refresh chain.
-2. Identify the normal UI entry point and any server-side feature gate.
-3. Preserve the upstream flow where it works; add TikTok+ UI/settings only where the base app is missing them.
+1. Preserve the existing upstream gallery -> crop -> upload -> profile commit flow; do not create a duplicate picker.
+2. Keep the server-controlled eligibility checks intact.
+3. Add TikTok+ branding/settings only where the base app is actually missing them.
 4. Rebuild and sign a test APK in CI without committing signing keys.
-5. Test install, launch, profile image selection, upload result, and regressions on Android.
+5. Test install, launch, profile image selection, server response, and regressions on Android.
 
 A local image only becomes visible to other users when the upstream service accepts it and returns it as profile data. Do not claim shared visibility before verifying that server round-trip.
 
@@ -49,4 +49,4 @@ A local image only becomes visible to other users when the upstream service acce
 
 ## Build status
 
-No modified APK has been produced yet. Current workflows perform static inspection only; they do not execute the app. The gallery route's account allowlist is controlled by TikTok's remote configuration, so a client-only rebrand cannot enable it for an account that the service has not allowed.
+No modified APK has been produced yet. Current workflows perform static inspection only; they do not execute the app. The gallery upload and commit code exists in the original package, but TikTok's remote allowlist and eligibility check determine whether a particular account can access it. A client-only rebrand cannot change that server decision.
