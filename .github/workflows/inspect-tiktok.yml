@@ -1,0 +1,127 @@
+name: Inspect TikTok ZIP (static only)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tiktok-47-9-3.zip"
+      - ".github/workflows/inspect-tiktok.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository and download LFS objects
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 1
+
+      - name: Inventory ZIP and search banner references
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, BadZipFile
+          from collections import Counter
+          import re
+
+          archive = Path("tiktok-47-9-3.zip")
+          out = Path("inspection")
+          out.mkdir(exist_ok=True)
+
+          if not archive.is_file():
+              raise SystemExit("Expected LFS archive was not downloaded.")
+
+          try:
+              with ZipFile(archive) as z:
+                  entries = [i for i in z.infolist() if not i.is_dir()]
+                  names = [i.filename for i in entries]
+                  ext_counts = Counter(Path(n).suffix.lower() or "[no extension]" for n in names)
+                  top = Counter(n.split("/", 1)[0] for n in names)
+                  apk_files = [i for i in entries if i.filename.lower().endswith(".apk")]
+                  gradle_files = [n for n in names if Path(n).name in {
+                      "gradlew", "settings.gradle", "settings.gradle.kts",
+                      "build.gradle", "build.gradle.kts"
+                  }]
+                  banner_rx = re.compile(
+                      r"banner|profile.?header|profile.?cover|cover.?image|profile.?background",
+                      re.IGNORECASE
+                  )
+                  text_exts = {
+                      ".xml", ".smali", ".java", ".kt", ".json", ".txt",
+                      ".gradle", ".kts", ".properties", ".pro", ".md",
+                      ".html", ".js", ".yaml", ".yml"
+                  }
+                  hits = []
+                  scanned = 0
+                  for info in entries:
+                      if Path(info.filename).suffix.lower() not in text_exts:
+                          continue
+                      if info.file_size > 1_000_000 or scanned >= 700:
+                          continue
+                      scanned += 1
+                      try:
+                          data = z.read(info)
+                          text = data.decode("utf-8", errors="replace")
+                      except Exception:
+                          continue
+                      matching = []
+                      for line_no, line in enumerate(text.splitlines(), 1):
+                          if banner_rx.search(line):
+                              matching.append((line_no, line.strip()[:220]))
+                              if len(matching) >= 12:
+                                  break
+                      if matching:
+                          hits.append((info.filename, matching))
+
+                  lines = [
+                      "# TikTok ZIP static inspection",
+                      "",
+                      f"- Archive size: {archive.stat().st_size:,} bytes",
+                      f"- Files in ZIP: {len(entries):,}",
+                      f"- Uncompressed file total: {sum(i.file_size for i in entries):,} bytes",
+                      f"- APK files: {len(apk_files)}",
+                      f"- Gradle project markers: {len(gradle_files)}",
+                      f"- Text files scanned for banner references: {scanned}",
+                      "",
+                      "## Top-level entries",
+                  ]
+                  for item, count in top.most_common(80):
+                      lines.append(f"- {item} ({count} files)")
+                  lines += ["", "## File types"]
+                  for ext, count in ext_counts.most_common(50):
+                      lines.append(f"- {ext}: {count}")
+                  lines += ["", "## APK candidates"]
+                  lines += [f"- {i.filename} ({i.file_size:,} bytes)" for i in apk_files] or ["- None found"]
+                  lines += ["", "## Android/Gradle markers"]
+                  lines += [f"- {n}" for n in gradle_files] or ["- No Gradle wrapper/build markers found"]
+                  lines += ["", "## Banner-related source/resource matches"]
+                  if hits:
+                      for filename, matches in hits[:150]:
+                          lines.append(f"### {filename}")
+                          for line_no, line in matches:
+                              lines.append(f"- Line {line_no}: `{line}`")
+                  else:
+                      lines.append("- No matching terms found in the scanned text files.")
+                  lines += [
+                      "",
+                      "## Safety and buildability note",
+                      "This was a static archive inspection. No APK or project scripts were executed.",
+                      "A compiled APK by itself is not a normal editable Android source project.",
+                  ]
+                  (out / "REPORT.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          except BadZipFile:
+              raise SystemExit("The LFS object was downloaded, but it is not a readable ZIP archive.")
+          PY
+
+      - name: Upload inspection report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiktok-static-inspection
+          path: inspection/REPORT.md
+          if-no-files-found: error
