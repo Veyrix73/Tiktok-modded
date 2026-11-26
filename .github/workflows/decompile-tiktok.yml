@@ -59,7 +59,7 @@ jobs:
               echo "## Focused profile-background references"
               grep -RniE --include='*.smali' 'ProfileBackgroundComponent|IProfileBackgroundAbility|profile_background|default_profile_cover_url|ProfileBackgroundExp|isBackgroundCoverClicked' decoded/smali* 2>/dev/null | head -n 500 || true
               mkdir -p analysis/relevant-smali
-              grep -RliE --include='*.smali' 'ProfileBackgroundComponent|IProfileBackgroundAbility|profile_background|default_profile_cover_url|ProfileBackgroundExp|profile_bg_in_allow_list|isBackgroundCoverClicked|ProfileBgImagePreviewActivity|ProfileBgVideoPreviewActivity|extra_bg_aweme_id|extra_bg_offset_ratio|extra_bg_updated|ImageBackgroundHandler|L[X/]0hbu;|L[X/]0hYI;|L[X/]0hYY;|L[X/]0P4W;|L[X/]1D5q;|L[X/]1DCx;|L[X/]01L0;|L[X/]01Dc;|L[X/]0Bbm;|L[X/]0NhE;|L[X/]0Ngv;|L[X/]0hYK;|L[X/]0hYZ;|L[X/]0hYa;|L[X/]0hYb;|Lvq4/m;|CropActivity|ARunnableS9S1200000_19_I1|ARunnableS65S0200000_19_I1|0PlW|0PlV|0PlY|0UgY' decoded/smali* 2>/dev/null | while IFS= read -r file; do
+              grep -RliE --include='*.smali' 'ProfileBackgroundComponent|IProfileBackgroundAbility|profile_background|default_profile_cover_url|ProfileBackgroundExp|profile_bg_in_allow_list|isBackgroundCoverClicked|ProfileBgImagePreviewActivity|ProfileBgVideoPreviewActivity|extra_bg_aweme_id|extra_bg_offset_ratio|extra_bg_updated|ImageBackgroundHandler|L[X/]0hbu;|L[X/]0hYI;|L[X/]0hYY;|L[X/]0P4W;|L[X/]1D5q;|L[X/]1DCx;|L[X/]01L0;|L[X/]01Dc;|L[X/]0Bbm;|L[X/]0NhE;|L[X/]0Ngv;|L[X/]0hYK;|L[X/]0hYZ;|L[X/]0hYa;|L[X/]0hYb;|L[X/]0het;|CommitUserBgResponse|commitProfileBackground|Lvq4/m;|CropActivity|ARunnableS9S1200000_19_I1|ARunnableS65S0200000_19_I1|0PlW|0PlV|0PlY|0UgY' decoded/smali* 2>/dev/null | while IFS= read -r file; do
                 mkdir -p "analysis/relevant-smali/$(dirname "$file")"
                 cp "$file" "analysis/relevant-smali/$file"
               done
@@ -77,7 +77,7 @@ jobs:
               grep -RniE --include='*.smali' 'profile_bg_in_allow_list|L[X/]0Ngv;->LJFF|L[X/]0Bbm;->LIZLLL|L[X/]0P4W;|L[X/]1D5q;|L[X/]01Dc;|L[X/]01L0;|L[X/]1DCx;|L[X/]0hYK;|L[X/]0hYZ;|L[X/]0hYa;|L[X/]0hYb;' decoded/smali* 2>/dev/null | head -n 800 || true
               echo
               echo "## Picker launch-site candidates"
-              grep -RniE --include='*.smali' '0x2738|\\b10040\\b' decoded/smali* 2>/dev/null | head -n 500 || true
+              grep -RniE --include='*.smali' '0x2738|10040' decoded/smali* 2>/dev/null | head -n 500 || true
               echo
               echo "## Profile background update helper references"
               grep -RniE --include='*.smali' 'L[X/]0PlW;|L[X/]0PlV;|L[X/]0PlY;|L[X/]0UgY;|L[X/]0hbu;' decoded/smali* 2>/dev/null | head -n 300 || true
