@@ -29,7 +29,7 @@ Static inspection of the original package confirms more than a renderer and prev
 - The profile preview/export activity separately saves a PNG to device media storage. That save routine is not the same thing as publishing the selected profile image.
 - The normal profile refresh path handles an Aweme/video background ID separately.
 
-**Engineering implication:** do not build a duplicate gallery picker before testing the existing route. The immediate task is to finish tracing the existing upload worker and its server response, then determine whether the gallery action is feature-gated, hidden by server configuration, or already accessible in the normal profile UI.
+**Availability gate confirmed in code:** `X/0Ngv.LIZ()` reads the current account ID and asks TikTok's remote configuration/AB manager for `profile_bg_in_allow_list` (config key ID `0x7c00`). The value is cached alongside the current account ID. `X/0Ngv.LJFF(true)` enables the profile-editor route only when that value is `1` and a second eligibility check, `X/0Bbm.LIZLLL()`, also passes. The editor's setup and activity-result handler both call this gate. This means the gallery picker/crop/upload code is compiled into the app but the UI/handler is intentionally unavailable to accounts that fail the experiment/eligibility checks. Do not force the gate to true or bypass the server rollout. The next task is to inspect the upload worker/controller and learn whether the upstream service accepts and publishes the image after an allowed account selects it.
 
 ## Implementation stages
 
@@ -49,4 +49,4 @@ A local image only becomes visible to other users when the upstream service acce
 
 ## Build status
 
-No modified APK has been produced yet. Current workflows perform static inspection only; they do not execute the app.
+No modified APK has been produced yet. Current workflows perform static inspection only; they do not execute the app. The gallery route's account allowlist is controlled by TikTok's remote configuration, so a client-only rebrand cannot enable it for an account that the service has not allowed.
