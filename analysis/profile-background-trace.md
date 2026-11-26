@@ -16,7 +16,7 @@ The coroutine:
 4. Compresses the preview bitmap as PNG at quality 100.
 5. Reports save failure through the app's logging path.
 
-This is an export/save-to-device operation. The inspected coroutine contains no network request and does not publish the image to the user's profile.
+This specific coroutine is only an export/save-to-device operation. It contains no network request and does not publish the image to the user's profile. **It is separate from the native gallery-background flow** documented in profile-gallery-flow.md, which crops a selected image, uploads it through X/0P4W, and commits the returned URI through X/0het.LIZIZ(...).
 
 ### Activity result
 The preview activity's `onActivityResult` forwards results to its internal handler. For request code `0x7d2`, a successful result is returned to the caller with `extra_bg_updated=true` (or the same flag is added when the returned Intent is null). This confirms an upstream activity flow exists, but the inspected snippet does not identify a custom image upload endpoint.
