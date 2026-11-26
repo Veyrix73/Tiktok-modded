@@ -21,6 +21,17 @@ File: `X/0hbu.smali`, method `LJFF(IILandroid/content/Intent;)Z`.
 
 This proves the app already contains a gallery-selection and crop pipeline tied to its profile-background handler. It corrects the earlier incomplete conclusion that the app had no gallery route.
 
+## Editor availability gate
+
+The profile editor is guarded by `X/0Ngv.LJFF(true)`:
+
+- `X/0Ngv.LIZ()` reads the current account UID and requests the remote AB/config value `profile_bg_in_allow_list` (config key ID `0x7c00`).
+- It caches the value alongside the UID so an account switch causes the snapshot to be refreshed.
+- `LJFF(true)` also calls `X/0Bbm.LIZLLL()`; both conditions must pass.
+- `MusProfileEditFragment` checks this before building the editor and before forwarding picker/crop results.
+
+This explains why the gallery flow can exist in the APK without being visible or usable for every account. The allowlist is server-controlled; this project will not patch around it.
+
 ## Remaining trace
 
 1. Inspect `LX/0P4W`, `LX/1D5q`, and their direct dependencies to determine the upload endpoint/result handling.
@@ -30,4 +41,4 @@ This proves the app already contains a gallery-selection and crop pipeline tied 
 
 ## Build status
 
-No APK has been modified or rebuilt. Static inspection only.
+No APK has been modified or rebuilt. Static inspection only. The latest workflow now collects the missing gate, uploader, and controller class references for follow-up.
