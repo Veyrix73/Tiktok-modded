@@ -74,16 +74,31 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "TEST_KEYSTORE_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
-          keytool -genkeypair -noprompt             -keystore dist/test-signing.keystore             -storepass "$TEST_KEYSTORE_PASSWORD"             -keypass "$TEST_KEYSTORE_PASSWORD"             -alias tiktokplus-test             -keyalg RSA -keysize 2048 -validity 3650             -dname "CN=TikTok Plus Test, OU=Test Build, O=Veyrix73, L=Riga, ST=LV, C=LV"
+          TEST_KEYSTORE_PASSWORD="$(openssl rand -hex 24)"
+          echo "TEST_KEYSTORE_PASSWORD=$TEST_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          keytool -genkeypair -noprompt \
+            -keystore dist/test-signing.keystore \
+            -storepass "$TEST_KEYSTORE_PASSWORD" \
+            -keypass "$TEST_KEYSTORE_PASSWORD" \
+            -alias tiktokplus-test \
+            -keyalg RSA -keysize 2048 -validity 3650 \
+            -dname "CN=TikTok Plus Test, OU=Test Build, O=Veyrix73, L=Riga, ST=LV, C=LV"
 
       - name: Align and sign test APK
         shell: bash
         run: |
           set -euo pipefail
           BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
-          "$BUILD_TOOLS/zipalign" -f -p 4             dist/test-Tiktok-plus-unsigned.apk             dist/test-Tiktok-plus-aligned.apk
-          "$BUILD_TOOLS/apksigner" sign             --ks dist/test-signing.keystore             --ks-key-alias tiktokplus-test             --ks-pass env:TEST_KEYSTORE_PASSWORD             --key-pass env:TEST_KEYSTORE_PASSWORD             --out "dist/test-Tiktok+.apk"             dist/test-Tiktok-plus-aligned.apk
+          "$BUILD_TOOLS/zipalign" -f -p 4 \
+            dist/test-Tiktok-plus-unsigned.apk \
+            dist/test-Tiktok-plus-aligned.apk
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks dist/test-signing.keystore \
+            --ks-key-alias tiktokplus-test \
+            --ks-pass env:TEST_KEYSTORE_PASSWORD \
+            --key-pass env:TEST_KEYSTORE_PASSWORD \
+            --out "dist/test-Tiktok+.apk" \
+            dist/test-Tiktok-plus-aligned.apk
           "$BUILD_TOOLS/apksigner" verify --verbose "dist/test-Tiktok+.apk"
           "$BUILD_TOOLS/aapt" dump badging "dist/test-Tiktok+.apk" | tee dist/apk-badging.txt
           grep -F "package: name='com.veyrix.tiktokplus.test'" dist/apk-badging.txt
