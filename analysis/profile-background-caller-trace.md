@@ -2,39 +2,32 @@
 
 Static analysis only; the APK was not executed.
 
-## Confirmed caller-side result handling
+## Video/Aweme background result
 
 File: `com/ss/android/ugc/profile/business/profile/ui/v2/I18nMyProfileFragment.smali`
 
-The fragment's activity-result handler checks the boolean extra `extra_bg_updated`. When it is true, it reads:
+The fragment's activity-result handler checks `extra_bg_updated`. When true, it reads `extra_bg_aweme_id` and `extra_bg_offset_ratio`, then calls `LX/0PlW;->LIZ(FLjava/lang/String;)`. That helper updates local profile model state from an existing Aweme ID. This is a separate path from choosing a local gallery image.
 
-- `extra_bg_aweme_id` as a string.
-- `extra_bg_offset_ratio` as a float, defaulting to `0.5`.
+## Gallery image path discovered in the shared handler
 
-It then calls:
+File: `X/0hbu.smali`, method `LJFF(IILandroid/content/Intent;)Z`.
 
-```smali
-sget-object v0, LX/0PlW;->LIZ:LX/0PlW;
-invoke-static {v1, v2}, LX/0PlW;->LIZ(FLjava/lang/String;)LX/0PlY;
-```
+- Request code `0x2738`: a successful picker result supplies a content `Uri`.
+- The handler validates the URI through `LX/01Dc;->LJIIJ(Context, Uri)`.
+- It launches `com/ss/android/ugc/profile/business/ur/ui/CropActivity` with the URI, background type metadata, and crop request code `0x2739`.
+- Request code `0x2739`: the crop result supplies another URI. The helper resolves it to a local path with `LX/01L0;->LIZ(Context, Uri)`.
+- The selected path is passed to `LX/0P4W` with the `LX/1D5q` upload controller and source metadata. The asynchronous worker and server response still need inspection to confirm the exact commit contract and persistence behavior.
+- The handler has an explicit photo-failure path that logs a failed photo operation.
 
-The returned `LX/0PlY` contains a `User` and a `ProfileUser`. The fragment passes those objects into its profile refresh/update method `RZ(...)`.
+This proves the app already contains a gallery-selection and crop pipeline tied to its profile-background handler. It corrects the earlier incomplete conclusion that the app had no gallery route.
 
-## What this proves
+## Remaining trace
 
-The preview activity result is not merely a UI close signal. The caller expects a background update result carrying an Aweme ID and vertical offset, then obtains updated profile model objects through the `0PlW.LIZ(float, String)` helper and refreshes the profile.
-
-## What this does not prove
-
-The result key is an Aweme ID, not a local image URI. This flow appears to be tied to an existing TikTok media item/background selection path. The code shown does not establish that arbitrary gallery images can be uploaded as profile backgrounds.
-
-The next inspection must determine:
-1. What `0PlW.LIZ(float, String)` does and whether it performs a supported server request.
-2. Which screen launches `ProfileBgImagePreviewActivity` and what media object it passes.
-3. Whether the image picker is for selecting a local image or choosing an existing TikTok post/media item.
-
-Do not substitute a guessed endpoint. If the existing flow only selects an Aweme, a separate local-only banner prototype or a separately operated sync service is needed for custom gallery images.
+1. Inspect `LX/0P4W`, `LX/1D5q`, and their direct dependencies to determine the upload endpoint/result handling.
+2. Find the UI action that launches the system image picker with request code `0x2738`.
+3. Check whether the action is controlled by a feature flag, server-returned profile capability, or ordinary UI state.
+4. Only then decide whether TikTok+ needs code changes or a visibility/entry-point fix.
 
 ## Build status
 
-No APK code has been modified or rebuilt.
+No APK has been modified or rebuilt. Static inspection only.
