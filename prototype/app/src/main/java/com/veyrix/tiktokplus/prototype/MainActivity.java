@@ -132,7 +132,7 @@ public class MainActivity extends Activity {
     private void addNavButton(LinearLayout nav, String label, Runnable action) {
         Button button = new Button(this);
         button.setText(label);
-        button.setTextAllCaps(false);
+        button.setAllCaps(false);
         button.setTextSize(12);
         button.setTextColor(TEAL);
         button.setBackgroundColor(Color.TRANSPARENT);
@@ -257,7 +257,7 @@ public class MainActivity extends Activity {
 
         Button clear = new Button(this);
         clear.setText("Remove banner");
-        clear.setTextAllCaps(false);
+        clear.setAllCaps(false);
         clear.setTextColor(CORAL);
         clear.setBackgroundColor(Color.TRANSPARENT);
         pageContent.addView(clear, margin(0, 0, 0, 10));
@@ -464,7 +464,7 @@ public class MainActivity extends Activity {
     private Button primaryButton(String label) {
         Button button = new Button(this);
         button.setText(label);
-        button.setTextAllCaps(false);
+        button.setAllCaps(false);
         button.setTextColor(Color.WHITE);
         button.setTextSize(14);
         button.setBackground(round(TEAL, 13));
@@ -474,7 +474,7 @@ public class MainActivity extends Activity {
     private Button actionButton(String label) {
         Button button = new Button(this);
         button.setText(label);
-        button.setTextAllCaps(false);
+        button.setAllCaps(false);
         button.setTextSize(11);
         button.setTextColor(INK);
         button.setMinWidth(0);
