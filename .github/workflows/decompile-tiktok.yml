@@ -59,10 +59,19 @@ jobs:
               echo "## Focused profile-background references"
               grep -RniE --include='*.smali' 'ProfileBackgroundComponent|IProfileBackgroundAbility|profile_background|default_profile_cover_url|ProfileBackgroundExp|isBackgroundCoverClicked' decoded/smali* 2>/dev/null | head -n 500 || true
               mkdir -p analysis/relevant-smali
-              grep -RliE --include='*.smali' 'ProfileBackgroundComponent|IProfileBackgroundAbility|profile_background|default_profile_cover_url|ProfileBackgroundExp|isBackgroundCoverClicked' decoded/smali* 2>/dev/null | head -n 80 | while IFS= read -r file; do
+              grep -RliE --include='*.smali' 'ProfileBackgroundComponent|IProfileBackgroundAbility|profile_background|default_profile_cover_url|ProfileBackgroundExp|isBackgroundCoverClicked|ProfileBgImagePreviewActivity|extra_bg_aweme_id|extra_bg_offset_ratio|extra_bg_updated|0PlW|0PlV|0PlY|0UgY|0hbu' decoded/smali* 2>/dev/null | while IFS= read -r file; do
                 mkdir -p "analysis/relevant-smali/$(dirname "$file")"
                 cp "$file" "analysis/relevant-smali/$file"
               done
+              echo
+              echo "## Exact preview activity callers"
+              grep -Rnl --include='*.smali' 'ProfileBgImagePreviewActivity' decoded/smali* 2>/dev/null | while IFS= read -r file; do
+                echo "### $file"
+                grep -n -C 12 'ProfileBgImagePreviewActivity' "$file" | head -n 160
+              done || true
+              echo
+              echo "## Profile background update helper references"
+              grep -RniE --include='*.smali' 'L[X/]0PlW;|L[X/]0PlV;|L[X/]0PlY;|L[X/]0UgY;|L[X/]0hbu;' decoded/smali* 2>/dev/null | head -n 300 || true
             } > analysis/REPORT.md
           else
             {
