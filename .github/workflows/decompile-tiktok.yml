@@ -55,6 +55,14 @@ jobs:
               echo
               echo "## Decoded DEX folders"
               find decoded -maxdepth 1 -type d -name 'smali*' -printf '%f\n' | sort
+              echo
+              echo "## Focused profile-background references"
+              grep -RniE --include='*.smali' 'ProfileBackgroundComponent|IProfileBackgroundAbility|profile_background|default_profile_cover_url|ProfileBackgroundExp|isBackgroundCoverClicked' decoded/smali* 2>/dev/null | head -n 500 || true
+              mkdir -p analysis/relevant-smali
+              grep -RliE --include='*.smali' 'ProfileBackgroundComponent|IProfileBackgroundAbility|profile_background|default_profile_cover_url|ProfileBackgroundExp|isBackgroundCoverClicked' decoded/smali* 2>/dev/null | head -n 80 | while IFS= read -r file; do
+                mkdir -p "analysis/relevant-smali/$(dirname "$file")"
+                cp "$file" "analysis/relevant-smali/$file"
+              done
             } > analysis/REPORT.md
           else
             {
