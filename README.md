@@ -20,16 +20,18 @@ TikTok+ is an experimental Android customization project based on the archived T
 
 ## Profile background findings
 
-Static inspection of the original package confirms more than a renderer and preview:
+Static inspection confirms the original TikTok 47.9.3 package already contains a complete gallery-image background flow:
 
-- The app contains a profile-background image handler, `X/0hbu`.
-- The handler receives a gallery result as an Android `Uri` for request code `0x2738`.
-- It validates the selected URI and opens TikTok's `CropActivity` with request code `0x2739`.
-- After the crop result, it resolves the selected file path and submits it to an asynchronous handler, `X/0P4W`, together with the profile upload controller `X/1D5q` and source metadata.
-- The profile preview/export activity separately saves a PNG to device media storage. That save routine is not the same thing as publishing the selected profile image.
-- The normal profile refresh path handles an Aweme/video background ID separately.
+- The profile-background component's image-change action runs through X/0hYa and X/0hbu.
+- Request 0x2738 receives a gallery URI. TikTok validates it and opens CropActivity with request code 0x2739.
+- The cropped file path is sent to upload worker X/0P4W through profile upload controller X/1D5q.
+- The upload handler receives an AvatarUri result, then coroutine X/0Plb calls X/0het.LIZIZ(AvatarUri.uri), which returns CommitUserBgResponse.
+- On an accepted response, X/0Pla updates the user's profile-background media type and image URL list, refreshes profile data, and reports success.
+- The existing retry handler retries selected temporary upload failures up to four times.
+- The video/Aweme background path is separate from the gallery-image path.
+- The preview activity's performSave routine only exports a PNG to device media storage; it is not the profile upload operation.
 
-**Availability gate confirmed in code:** `X/0Ngv.LIZ()` reads the current account ID and asks TikTok's remote configuration/AB manager for `profile_bg_in_allow_list` (config key ID `0x7c00`). The value is cached alongside the current account ID. `X/0Ngv.LJFF(true)` enables the profile-editor route only when that value is `1` and a second eligibility check, `X/0Bbm.LIZLLL()`, also passes. The editor's setup and activity-result handler both call this gate. This means the gallery picker/crop/upload code is compiled into the app but the UI/handler is intentionally unavailable to accounts that fail the experiment/eligibility checks. Do not force the gate to true or bypass the server rollout. The next task is to inspect the upload worker/controller and learn whether the upstream service accepts and publishes the image after an allowed account selects it.
+**Availability gate confirmed in code:** X/0Ngv.LIZ() reads the current account ID and asks TikTok's remote AB/config manager for profile_bg_in_allow_list (config key ID 0x7c00). X/0Ngv.LJFF(true) enables the profile-editor route only when that value is 1 and a second eligibility check, X/0Bbm.LIZLLL(), also passes. The profile editor checks this during setup and before handling picker/crop results. The gallery upload code is present, but an account that fails either check cannot use the route. This is a server-controlled rollout/eligibility condition, not a missing gallery picker. Do not force the flag or bypass the rollout.
 
 ## Implementation stages
 
