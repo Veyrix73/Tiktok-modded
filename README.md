@@ -6,7 +6,7 @@ TikTok+ is an experimental Android customization project based on the archived T
 
 - Use the TikTok+ name and supplied logo for project branding.
 - Preserve the upstream TikTok experience wherever its app and services allow.
-- Add optional profile customization, starting with custom profile backgrounds.
+- Improve profile customization and expose supported profile-image flows clearly.
 - Keep TikTok+ additions language- and country-neutral; do not hard-code a country allowlist.
 - Keep changes isolated and reversible.
 
@@ -18,27 +18,28 @@ TikTok+ is an experimental Android customization project based on the archived T
 - Target Android SDK: 36
 - Repository contains the original app archive and static-inspection workflows. It is **not yet a rebuilt TikTok+ APK**.
 
-## Profile background code findings
+## Profile background findings
 
-Static decode confirms the upstream app has a profile-background data path:
+Static inspection of the original package confirms more than a renderer and preview:
 
-- `ProfileUser.profileBackground` is a serialized profile component (`profile_background`).
-- The profile background renderer consumes `ProfileBgInfo` data, including video/image variants.
-- The profile preview activity is `ProfileBgImagePreviewActivity`.
-- Its `onActivityResult` handles result code `0x7d2` and returns an `extra_bg_updated` flag to its caller.
-- The coroutine named `ProfileBgImagePreviewActivity$performSave$1` creates a timestamped `profile_background_*.png`, opens an output stream through the app context's content resolver, and compresses the preview bitmap as PNG.
+- The app contains a profile-background image handler, `X/0hbu`.
+- The handler receives a gallery result as an Android `Uri` for request code `0x2738`.
+- It validates the selected URI and opens TikTok's `CropActivity` with request code `0x2739`.
+- After the crop result, it resolves the selected file path and submits it to an asynchronous handler, `X/0P4W`, together with the profile upload controller `X/1D5q` and source metadata.
+- The profile preview/export activity separately saves a PNG to device media storage. That save routine is not the same thing as publishing the selected profile image.
+- The normal profile refresh path handles an Aweme/video background ID separately.
 
-**Critical distinction:** that `performSave` routine saves the preview bitmap into the device's media storage. The inspected method does not call a network API or upload a profile-background image. So it is a local export/save action, not proof of a publish-to-profile feature. The `profile_background` profile component is populated through profile data; custom publishing still needs a supported server endpoint or a separate sync service.
+**Engineering implication:** do not build a duplicate gallery picker before testing the existing route. The immediate task is to finish tracing the existing upload worker and its server response, then determine whether the gallery action is feature-gated, hidden by server configuration, or already accessible in the normal profile UI.
 
 ## Implementation stages
 
-1. Trace the activity that launches the preview, the image selection/crop flow, and the caller of `performSave` to identify the intended feature boundary.
-2. Determine whether an existing supported TikTok API publishes profile background images; do not guess endpoint names or fabricate server behavior.
-3. If no supported publishing endpoint exists, prototype a local-only TikTok+ background using app-private storage and the existing renderer, clearly labelled local-only.
-4. Add shared visibility only with a secure, documented sync service and user opt-in.
-5. Test install, launch, profile loading, and regressions on Android.
+1. Finish tracing the existing gallery -> crop -> upload worker -> profile refresh chain.
+2. Identify the normal UI entry point and any server-side feature gate.
+3. Preserve the upstream flow where it works; add TikTok+ UI/settings only where the base app is missing them.
+4. Rebuild and sign a test APK in CI without committing signing keys.
+5. Test install, launch, profile image selection, upload result, and regressions on Android.
 
-A locally selected image cannot automatically appear on another person's device. Shared banners require a server-side service or an upstream TikTok feature that accepts and returns the image URL.
+A local image only becomes visible to other users when the upstream service accepts it and returns it as profile data. Do not claim shared visibility before verifying that server round-trip.
 
 ## Compatibility and limitations
 
@@ -48,4 +49,4 @@ A locally selected image cannot automatically appear on another person's device.
 
 ## Build status
 
-No modified APK has been produced. Current workflows perform static inspection only; they do not execute the app.
+No modified APK has been produced yet. Current workflows perform static inspection only; they do not execute the app.
