@@ -1,6 +1,17 @@
 package com.veyrix.tiktokplus.prototype;
 
 import android.app.Activity;
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.provider.Settings;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -53,11 +64,14 @@ public class MainActivity extends Activity {
     private float dragStartY;
     private float viewStartX;
     private float viewStartY;
+    private BroadcastReceiver updateDownloadReceiver;
+    private boolean receiverRegistered;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        registerUpdateDownloadReceiver();
 
         getWindow().setStatusBarColor(Color.WHITE);
         getWindow().setNavigationBarColor(Color.WHITE);
@@ -309,6 +323,194 @@ public class MainActivity extends Activity {
 
         addNote("The banner is displayed and saved on this device only. It is not uploaded or shared.");
         addNote("Likes, comments and created posts in this prototype are also local demo data.");
+
+        Button updates = primaryButton("Check for app updates");
+        pageContent.addView(updates, margin(0, dp(12), 0, 8));
+        updates.setOnClickListener(v -> checkForUpdates());
+        addNote("Updates are checked through GitHub Releases. Install prompts are handled by Android.");
+    }
+
+
+    private void checkForUpdates() {
+        Toast.makeText(this, "Checking for updates...", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL("https://api.github.com/repos/Veyrix73/Tiktok-modded/releases/latest");
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(10000);
+                connection.setReadTimeout(10000);
+                connection.setRequestProperty("Accept", "application/vnd.github+json");
+                connection.setRequestProperty("User-Agent", "TikTokPlus-Prototype-Updater");
+                if (connection.getResponseCode() != 200) {
+                    throw new Exception("No published update is available yet.");
+                }
+                java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+                try (java.io.InputStream input = connection.getInputStream()) {
+                    byte[] buffer = new byte[4096];
+                    int count;
+                    while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                }
+                JSONObject release = new JSONObject(output.toString("UTF-8"));
+                String tag = release.optString("tag_name", "").replaceFirst("^[vV]", "");
+                String downloadUrl = null;
+                JSONArray assets = release.optJSONArray("assets");
+                if (assets != null) {
+                    for (int i = 0; i < assets.length(); i++) {
+                        JSONObject asset = assets.getJSONObject(i);
+                        if ("tiktok-plus-prototype.apk".equals(asset.optString("name"))) {
+                            downloadUrl = asset.optString("browser_download_url", null);
+                            break;
+                        }
+                    }
+                }
+                final String latest = tag;
+                final String apkUrl = downloadUrl;
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    if (isFinishing()) return;
+                    if (latest.isEmpty() || compareVersions(latest, BuildConfig.VERSION_NAME) <= 0) {
+                        new AlertDialog.Builder(this)
+                                .setTitle("You're up to date")
+                                .setMessage("Installed version: " + BuildConfig.VERSION_NAME)
+                                .setPositiveButton("OK", null).show();
+                    } else if (apkUrl == null || apkUrl.isEmpty()) {
+                        new AlertDialog.Builder(this)
+                                .setTitle("Update found: " + latest)
+                                .setMessage("The release exists, but its APK file has not been attached yet.")
+                                .setPositiveButton("OK", null).show();
+                    } else {
+                        new AlertDialog.Builder(this)
+                                .setTitle("Update available")
+                                .setMessage("Version " + latest + " is ready. Download and install it?")
+                                .setNegativeButton("Later", null)
+                                .setPositiveButton("Download", (dialog, which) -> downloadUpdate(apkUrl, latest))
+                                .show();
+                    }
+                });
+            } catch (Exception e) {
+                String message = e.getMessage() == null ? "Could not check GitHub Releases." : e.getMessage();
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    if (!isFinishing()) new AlertDialog.Builder(this)
+                            .setTitle("Update check failed")
+                            .setMessage(message + "\n\nCheck your internet connection or try again later.")
+                            .setPositiveButton("OK", null).show();
+                });
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        }).start();
+    }
+
+    private int compareVersions(String left, String right) {
+        try {
+            String[] a = left.split("[.-]");
+            String[] b = right.replaceFirst("^[vV]", "").split("[.-]");
+            for (int i = 0; i < 3; i++) {
+                int av = i < a.length ? Integer.parseInt(a[i]) : 0;
+                int bv = i < b.length ? Integer.parseInt(b[i]) : 0;
+                if (av != bv) return Integer.compare(av, bv);
+            }
+        } catch (Exception ignored) { }
+        return left.compareToIgnoreCase(right);
+    }
+
+    private void downloadUpdate(String apkUrl, String version) {
+        try {
+            DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(apkUrl));
+            request.setTitle("TikTok+ update " + version);
+            request.setDescription("Downloading the latest TikTok+ prototype APK");
+            request.setMimeType("application/vnd.android.package-archive");
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setAllowedOverMetered(true);
+            request.setAllowedOverRoaming(false);
+            long id = manager.enqueue(request);
+            prefs.edit().putLong("pending_update_download", id).apply();
+            Toast.makeText(this, "Update downloading. Android will ask before installing.", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Could not start the update download.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void registerUpdateDownloadReceiver() {
+        updateDownloadReceiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context context, Intent intent) {
+                long completedId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+                if (completedId == prefs.getLong("pending_update_download", -2)) {
+                    installDownloadedUpdate();
+                }
+            }
+        };
+        IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(updateDownloadReceiver, filter, Context.RECEIVER_EXPORTED);
+        } else {
+            registerReceiver(updateDownloadReceiver, filter);
+        }
+        receiverRegistered = true;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (prefs != null && prefs.getLong("pending_update_download", -1) != -1) {
+            installDownloadedUpdate();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (receiverRegistered && updateDownloadReceiver != null) {
+            unregisterReceiver(updateDownloadReceiver);
+            receiverRegistered = false;
+        }
+        super.onDestroy();
+    }
+
+    private void installDownloadedUpdate() {
+        long id = prefs.getLong("pending_update_download", -1);
+        if (id == -1) return;
+        DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+        DownloadManager.Query query = new DownloadManager.Query().setFilterById(id);
+        try (android.database.Cursor cursor = manager.query(query)) {
+            if (cursor == null || !cursor.moveToFirst()) return;
+            int status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+            if (status == DownloadManager.STATUS_FAILED) {
+                prefs.edit().remove("pending_update_download").apply();
+                Toast.makeText(this, "Update download failed. Please try again.", Toast.LENGTH_LONG).show();
+                return;
+            }
+            if (status != DownloadManager.STATUS_SUCCESSFUL) return;
+        } catch (Exception ignored) {
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Allow APK installation")
+                    .setMessage("Android needs permission to install updates downloaded from GitHub. Allow installs for TikTok+ Test on the next screen, then return here.")
+                    .setNegativeButton("Not now", null)
+                    .setPositiveButton("Open settings", (dialog, which) -> {
+                        Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.parse("package:" + getPackageName()));
+                        startActivity(settings);
+                    }).show();
+            return;
+        }
+
+        Uri apkUri = manager.getUriForDownloadedFile(id);
+        if (apkUri == null) return;
+        prefs.edit().remove("pending_update_download").apply();
+        Intent install = new Intent(Intent.ACTION_VIEW);
+        install.setDataAndType(apkUri, "application/vnd.android.package-archive");
+        install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startActivity(install);
+        } catch (Exception e) {
+            prefs.edit().putLong("pending_update_download", id).apply();
+            Toast.makeText(this, "Android could not open the APK installer.", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void chooseBanner() {
