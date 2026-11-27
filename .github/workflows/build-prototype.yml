@@ -7,9 +7,11 @@ on:
       - "prototype/**"
       - ".github/workflows/build-prototype.yml"
   workflow_dispatch:
+  push:
+    tags: ["v*"]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: tiktokplus-independent-prototype
@@ -45,14 +47,30 @@ jobs:
           unzip -q /tmp/gradle-8.9-bin.zip -d /tmp
           /tmp/gradle-8.9/bin/gradle --version
 
+      - name: Reuse stable prototype signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: tiktokplus-prototype-debug-signing-key-v1
+
       - name: Build debug APK from original source
         shell: bash
         run: |
           set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
+            VERSION_CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH))
+          else
+            VERSION="0.2.0"
+            VERSION_CODE=2
+          fi
           /tmp/gradle-8.9/bin/gradle \
             --no-daemon \
             --stacktrace \
             -p prototype \
+            -PappVersionName="$VERSION" \
+            -PappVersionCode="$VERSION_CODE" \
             :app:assembleDebug
           mkdir -p out
           cp prototype/app/build/outputs/apk/debug/app-debug.apk \
@@ -81,3 +99,11 @@ jobs:
             out/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/test-Tiktok-plus-prototype.apk
+          generate_release_notes: true
+          name: TikTok+ ${{ github.ref_name }}
