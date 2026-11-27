@@ -29,12 +29,12 @@ A separate prototype cannot log into TikTok, upload to TikTok, display TikTok's 
 
 ## Android prototype updater
 
-The independent Android prototype includes a **Check for app updates** button on the Profile screen. It checks the latest published GitHub Release, downloads the attached `tiktok-plus-prototype.apk`, and hands it to Android's package installer. Android still asks the user to approve installation; the app does not silently install updates.
+The independent Android prototype includes a **Check for app updates** button on the Profile screen. It checks the latest published GitHub Release, downloads the attached `test-Tiktok-plus-prototype.apk`, and hands it to Android's package installer. Android still asks the user to approve installation; the app does not silently install updates.
 
-Every push to `main` builds a versioned test APK and publishes it as a GitHub Release, so the in-app checker has a release to query. For manually numbered releases, push a semantic-version tag such as `v0.4.0`. The workflow keeps its prototype-only Android debug signing key in a GitHub Actions cache and runs a scheduled build every five days to keep that cache active. Do not reuse this public prototype signing setup for a production app.
+Every push to `main` builds a versioned test APK and publishes it as a GitHub Release (`v0.3.<run number>`). Version codes increase with each workflow run. A scheduled build every five days refreshes the cached prototype-only Android debug signing key but does not publish another release. This keeps successive test APKs installable as updates. The signing setup is only for this public prototype; do not reuse it for a production app.
 
 The updater only applies to this independent prototype. It does not update or patch the original TikTok application.
 
 ## Build status
 
-The Android workflow builds and verifies the original-source prototype APK and uploads a short-lived Actions artifact. A GitHub Release is created when a `v*` version tag is pushed.
+The Android workflow builds and verifies the original-source prototype APK and uploads a 14-day Actions artifact. Pushes to `main` and manual runs on `main` also publish the APK as a GitHub Release. Scheduled builds only refresh the signing-key cache.
