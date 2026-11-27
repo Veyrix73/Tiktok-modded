@@ -3,7 +3,6 @@ name: Build independent TikTok+ concept prototype
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   workflow_dispatch:
   schedule:
     - cron: "0 5 */5 * *"
@@ -51,22 +50,28 @@ jobs:
           path: ~/.android/debug.keystore
           key: tiktokplus-prototype-debug-signing-key-v1
 
+      - name: Ensure stable prototype signing key exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android"
+          if [[ ! -f "$HOME/.android/debug.keystore" ]]; then
+            keytool -genkeypair -v \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storetype JKS \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US" \
+              -keyalg RSA -keysize 2048 -validity 10000
+          fi
+
       - name: Build debug APK from original source
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-            if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "Release tags must use semantic versions like v0.4.0"
-              exit 1
-            fi
-            IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
-            VERSION_CODE=$((MAJOR * 1000000 + MINOR * 1000 + PATCH))
-          else
-            VERSION="0.3.${GITHUB_RUN_NUMBER}"
-            VERSION_CODE=$((3000 + GITHUB_RUN_NUMBER))
-          fi
+          VERSION="0.3.${GITHUB_RUN_NUMBER}"
+          VERSION_CODE=$((200 + GITHUB_RUN_NUMBER))
           /tmp/gradle-8.9/bin/gradle \
             --no-daemon \
             --stacktrace \
@@ -103,11 +108,11 @@ jobs:
           retention-days: 14
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'schedule'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v0.3.{0}', github.run_number) }}
-          name: TikTok+ ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v0.3.{0}', github.run_number) }}
+          tag_name: ${{ format('v0.3.{0}', github.run_number) }}
+          name: TikTok+ ${{ format('v0.3.{0}', github.run_number) }}
           files: out/test-Tiktok-plus-prototype.apk
           generate_release_notes: true
           make_latest: true
