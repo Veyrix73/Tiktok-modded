@@ -6,7 +6,7 @@ This repository contains a user-provided TikTok 47.9.3 archive and static-analys
 
 - The original archive is retained as the supplied input.
 - Static-inspection workflows and reports document the profile gallery, crop, upload and server commit flow.
-- No modified TikTok APK is published by this repository.
+- No modified TikTok APK is published by this repository; only the separate, original-source Android prototype is built and released.
 - The temporary APK-repackaging workflow and patch script were removed. They attempted to rebuild and rebrand TikTok's proprietary binary, which is not an appropriate deliverable.
 
 ## Profile background investigation
