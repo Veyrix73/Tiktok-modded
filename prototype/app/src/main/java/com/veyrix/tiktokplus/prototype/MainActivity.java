@@ -359,7 +359,7 @@ public class MainActivity extends Activity {
                 if (assets != null) {
                     for (int i = 0; i < assets.length(); i++) {
                         JSONObject asset = assets.getJSONObject(i);
-                        if ("tiktok-plus-prototype.apk".equals(asset.optString("name"))) {
+                        if ("test-Tiktok-plus-prototype.apk".equals(asset.optString("name"))) {
                             downloadUrl = asset.optString("browser_download_url", null);
                             break;
                         }
