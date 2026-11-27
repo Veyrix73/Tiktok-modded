@@ -45,6 +45,14 @@ public class MainActivity extends Activity {
     private SharedPreferences prefs;
     private LinearLayout pageContent;
     private TextView pageTitle;
+    private ImageView activeBanner;
+    private float bannerZoom = 1.0f;
+    private float bannerOffsetX = 0f;
+    private float bannerOffsetY = 0f;
+    private float dragStartX;
+    private float dragStartY;
+    private float viewStartX;
+    private float viewStartY;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -226,6 +234,10 @@ public class MainActivity extends Activity {
         bannerFrame.setBackground(round(Color.rgb(220, 245, 240), 18));
         ImageView banner = new ImageView(this);
         banner.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        activeBanner = banner;
+        bannerZoom = prefs.getFloat("profile_banner_zoom", 1.0f);
+        bannerOffsetX = prefs.getFloat("profile_banner_x", 0f);
+        bannerOffsetY = prefs.getFloat("profile_banner_y", 0f);
         banner.setBackground(round(Color.rgb(220, 245, 240), 18));
         FrameLayout.LayoutParams imageParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(150)
@@ -250,10 +262,35 @@ public class MainActivity extends Activity {
             bannerFrame.addView(placeholder, imageParams);
         }
         pageContent.addView(bannerFrame, margin(0, 0, 0, 12));
+        applyBannerTransform(banner);
+        banner.setOnTouchListener((view, event) -> {
+            switch (event.getAction()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    dragStartX = event.getRawX();
+                    dragStartY = event.getRawY();
+                    viewStartX = bannerOffsetX;
+                    viewStartY = bannerOffsetY;
+                    return true;
+                case android.view.MotionEvent.ACTION_MOVE:
+                    bannerOffsetX = viewStartX + event.getRawX() - dragStartX;
+                    bannerOffsetY = viewStartY + event.getRawY() - dragStartY;
+                    applyBannerTransform(banner);
+                    return true;
+                case android.view.MotionEvent.ACTION_UP:
+                    saveBannerTransform();
+                    return true;
+                default:
+                    return true;
+            }
+        });
 
         Button choose = primaryButton("Choose banner from gallery");
         pageContent.addView(choose, margin(0, 0, 0, 8));
         choose.setOnClickListener(v -> chooseBanner());
+
+        Button adjust = primaryButton("Adjust banner zoom");
+        pageContent.addView(adjust, margin(0, 0, 0, 8));
+        adjust.setOnClickListener(v -> showBannerAdjustDialog());
 
         Button clear = new Button(this);
         clear.setText("Remove banner");
@@ -262,7 +299,11 @@ public class MainActivity extends Activity {
         clear.setBackgroundColor(Color.TRANSPARENT);
         pageContent.addView(clear, margin(0, 0, 0, 10));
         clear.setOnClickListener(v -> {
-            prefs.edit().remove("profile_banner_uri").apply();
+            prefs.edit().remove("profile_banner_uri")
+                    .remove("profile_banner_zoom")
+                    .remove("profile_banner_x")
+                    .remove("profile_banner_y")
+                    .apply();
             showProfile();
         });
 
@@ -296,8 +337,70 @@ public class MainActivity extends Activity {
         } catch (SecurityException ignored) {
             // Some providers return a readable URI without persistable permission.
         }
-        prefs.edit().putString("profile_banner_uri", uri.toString()).apply();
+        prefs.edit().putString("profile_banner_uri", uri.toString())
+                .putFloat("profile_banner_zoom", 1.0f)
+                .putFloat("profile_banner_x", 0f)
+                .putFloat("profile_banner_y", 0f)
+                .apply();
         showProfile();
+    }
+
+    private void showBannerAdjustDialog() {
+        if (activeBanner == null) return;
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(20), dp(8), dp(20), dp(4));
+        TextView hint = new TextView(this);
+        hint.setText("Drag the banner left, right, up or down to reposition it. Use the slider to zoom.");
+        hint.setTextColor(INK);
+        hint.setTextSize(14);
+        content.addView(hint, margin(0, 0, 0, 8));
+        android.widget.SeekBar zoom = new android.widget.SeekBar(this);
+        zoom.setMax(150);
+        zoom.setProgress(Math.max(0, Math.min(150, Math.round((bannerZoom - 1f) * 100f))));
+        content.addView(zoom);
+        TextView value = new TextView(this);
+        value.setText("Zoom: " + Math.round(bannerZoom * 100) + "%");
+        value.setTextColor(MUTED);
+        value.setTextSize(12);
+        content.addView(value);
+        zoom.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(android.widget.SeekBar bar, int progress, boolean fromUser) {
+                bannerZoom = 1f + progress / 100f;
+                value.setText("Zoom: " + Math.round(bannerZoom * 100) + "%");
+                applyBannerTransform(activeBanner);
+            }
+            @Override public void onStartTrackingTouch(android.widget.SeekBar bar) { }
+            @Override public void onStopTrackingTouch(android.widget.SeekBar bar) { saveBannerTransform(); }
+        });
+        new AlertDialog.Builder(this)
+                .setTitle("Adjust profile banner")
+                .setView(content)
+                .setNegativeButton("Reset", (dialog, which) -> {
+                    bannerZoom = 1f;
+                    bannerOffsetX = 0f;
+                    bannerOffsetY = 0f;
+                    saveBannerTransform();
+                    showProfile();
+                })
+                .setPositiveButton("Done", (dialog, which) -> saveBannerTransform())
+                .show();
+    }
+
+    private void applyBannerTransform(ImageView image) {
+        if (image == null) return;
+        image.setScaleX(bannerZoom);
+        image.setScaleY(bannerZoom);
+        image.setTranslationX(bannerOffsetX);
+        image.setTranslationY(bannerOffsetY);
+    }
+
+    private void saveBannerTransform() {
+        prefs.edit()
+                .putFloat("profile_banner_zoom", bannerZoom)
+                .putFloat("profile_banner_x", bannerOffsetX)
+                .putFloat("profile_banner_y", bannerOffsetY)
+                .apply();
     }
 
     private LinearLayout buildPostCard(Post post) {
