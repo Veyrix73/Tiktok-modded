@@ -31,7 +31,7 @@ A separate prototype cannot log into TikTok, upload to TikTok, display TikTok's 
 
 The independent Android prototype includes a **Check for app updates** button on the Profile screen. It checks the latest published GitHub Release, downloads the attached `tiktok-plus-prototype.apk`, and hands it to Android's package installer. Android still asks the user to approve installation; the app does not silently install updates.
 
-To publish an update, push a semantic-version tag such as `v0.2.1`. The Android workflow builds the APK and attaches it to a GitHub Release. The workflow caches one prototype-only debug signing key so successive release APKs can update an installation built by this workflow. Do not reuse this public prototype signing setup for a production app.
+Every push to `main` builds a versioned test APK and publishes it as a GitHub Release, so the in-app checker has a release to query. For manually numbered releases, push a semantic-version tag such as `v0.4.0`. The workflow keeps its prototype-only Android debug signing key in a GitHub Actions cache and runs a scheduled build every five days to keep that cache active. Do not reuse this public prototype signing setup for a production app.
 
 The updater only applies to this independent prototype. It does not update or patch the original TikTok application.
 
